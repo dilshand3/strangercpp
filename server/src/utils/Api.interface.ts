@@ -3,4 +3,3 @@ export interface Ires {
     message: string;
     data?: object;
 }
-
