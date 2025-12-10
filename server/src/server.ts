@@ -21,6 +21,6 @@ const redisClient = new Redis(REDIS_URL);
 initializeMatchHandler(io, redisClient);
 
 httpServer.listen(port, () => {
-    console.log(`\n🚀 Server is running on port ${port}`);
-    console.log(`📡 Socket.io is ready for WebRTC signaling`);
+    console.log(`\n Server is running on port ${port}`);
+    console.log(` Socket.io is ready for WebRTC signaling`);
 });
