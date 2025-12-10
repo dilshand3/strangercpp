@@ -68,7 +68,6 @@ export const initializeMatchHandler = (io: Server, redisClient: Redis) => {
         });
 
         socket.on("ice-candidate", (data: { targetId: string; candidate: any }) => {
-            const hasCandidate = data.candidate && data.candidate.candidate;
 
             socket.to(data.targetId).emit("ice-candidate", {
                 senderId: socket.id,

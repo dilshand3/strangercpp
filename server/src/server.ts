@@ -5,7 +5,7 @@ import { app } from "./app";
 import { initializeMatchHandler } from "./controller/matchHandler.controller";
 
 const port = process.env.PORT || 2093;
-const REDIS_URL = 'redis://localhost:6379';
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
 const httpServer = createServer(app);
 
