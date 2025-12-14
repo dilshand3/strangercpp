@@ -5,7 +5,7 @@ import { app } from "./app";
 import { initializeMatchHandler } from "./controller/matchHandler.controller";
 
 const port = process.env.PORT || 2093;
-const REDIS_URL = 'redis://localhost:6379';
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
 const httpServer = createServer(app);
 
@@ -21,6 +21,6 @@ const redisClient = new Redis(REDIS_URL);
 initializeMatchHandler(io, redisClient);
 
 httpServer.listen(port, () => {
-    console.log(`\n🚀 Server is running on port ${port}`);
-    console.log(`📡 Socket.io is ready for WebRTC signaling`);
+    console.log(`\n Server is running on port ${port}`);
+    console.log(` Socket.io is ready for WebRTC signaling`);
 });
