@@ -73,6 +73,7 @@
 .video-container {
   flex: 1;
   position: relative;
+  left: -10px;
   width: 100%;
   display: flex;
   align-items: center;
