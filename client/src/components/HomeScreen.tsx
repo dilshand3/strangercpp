@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSocket } from "@/context/SocketContext";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import '@/components/home.css';
+import gsap from 'gsap';
 
 enum CallStatus {
   IDLE = "IDLE",
@@ -15,13 +16,35 @@ export default function HomeScreen() {
   const { socket, isConnected } = useSocket();
   const [status, setStatus] = useState<CallStatus>(CallStatus.IDLE);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [isCameraOn, setIsCameraOn] = useState(true);
+  const [isMicOn, setIsMicOn] = useState(true);
 
   const { remoteStream, startCall, endCall, remotePeerId } = useWebRTC(localStream);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const localContainerRef = useRef<HTMLDivElement>(null);
 
-  // 1. Camera Access
+  const toggleCamera = () => {
+    if (localStream) {
+      const videoTrack = localStream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+        setIsCameraOn(videoTrack.enabled);
+      }
+    }
+  };
+
+  const toggleMic = () => {
+    if (localStream) {
+      const audioTrack = localStream.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        setIsMicOn(audioTrack.enabled);
+      }
+    }
+  };
+
   useEffect(() => {
     const getMedia = async () => {
       try {
@@ -34,29 +57,33 @@ export default function HomeScreen() {
           localVideoRef.current.srcObject = stream;
         }
       } catch (err) {
-        console.error("Error accessing media:", err);
         alert("Camera permission is required!");
       }
     };
     getMedia();
   }, []);
 
-  // 2. Refresh Local Video
   useEffect(() => {
     if (localStream && localVideoRef.current) {
       localVideoRef.current.srcObject = localStream;
     }
   }, [localStream]);
 
-  // 3. Set Remote Video
   useEffect(() => {
     if (remoteStream && remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = remoteStream;
     }
   }, [remoteStream]);
 
+  useEffect(() => {
+    if (status === CallStatus.CONNECTED && localContainerRef.current) {
+      gsap.to(localContainerRef.current, {
+        duration: 0.6,
+        ease: "power2.out"
+      });
+    }
+  }, [status]);
 
-  // 4. Socket Events
   useEffect(() => {
     if (!socket) return;
 
@@ -70,10 +97,10 @@ export default function HomeScreen() {
         if (data.isInitiator) {
           startCall(data.peerId);
         } else {
-          console.log("⏳ [UI] You are the Receiver. Waiting for Offer...");
+          console.log("[UI] You are the Receiver. Waiting for Offer...");
         }
       } else {
-        console.error("❌ [UI] Cannot start call, No Local Stream!");
+        console.error("[UI] Cannot start call, No Local Stream!");
       }
     });
 
@@ -89,7 +116,6 @@ export default function HomeScreen() {
     };
   }, [socket, localStream, startCall, endCall]);
 
-  // Handlers
   const handleStart = () => {
     if (!socket || !localStream) return;
     setStatus(CallStatus.SEARCHING);
@@ -104,32 +130,32 @@ export default function HomeScreen() {
     endCall();
     setStatus(CallStatus.IDLE);
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
-  }
+  };
 
   const handleNextMatch = () => {
     endCall();
     handleStart();
-  }
+  };
 
   return (
     <div className="main-container">
+      {status !== CallStatus.CONNECTED && (
+        <header className="header">
+          <h1>Stranger Talk</h1>
+          <div className="status-badge">
+            <span className={`status-dot ${isConnected ? "online" : ""}`}></span>
+            <span className="status-text">
+              {isConnected ? "Server Online" : "Connecting..."}
+            </span>
+          </div>
+        </header>
+      )}
 
-      {/* HEADER */}
-      <header className="header">
-        <h1 className="title">Stranger.cpp</h1>
-        <div className="status-badge">
-          <span className={`status-dot ${isConnected ? "online" : ""}`}></span>
-          <span className="status-text">
-            {isConnected ? "Server Online" : "Connecting..."}
-          </span>
-        </div>
-      </header>
-
-      {/* VIDEO AREA */}
-      <div className="video-grid">
-
-        {/* Local Video */}
-        <div className="video-card local">
+      <div className={`video-container ${status === CallStatus.CONNECTED ? 'connected' : ''}`}>
+        <div 
+          ref={localContainerRef}
+          className={`video-card local ${status === CallStatus.CONNECTED ? 'minimized' : ''}`}
+        >
           <video
             ref={localVideoRef}
             autoPlay
@@ -137,69 +163,130 @@ export default function HomeScreen() {
             playsInline
             className="full-video-element mirror"
           />
+          {!isCameraOn && (
+            <div className="camera-off-overlay">
+              <span className="material-icons camera-off-icon">videocam_off</span>
+              <p>Camera Off</p>
+            </div>
+          )}
           <div className="video-label">YOU</div>
+          
+          <div className="media-controls">
+            {status === CallStatus.IDLE && (
+              <button
+                onClick={handleStart}
+                disabled={!isConnected}
+                className="btn btn-primary btn-large desktop-start-btn"
+              >
+                <span className="material-icons">video_call</span>
+                Start Chat
+              </button>
+            )}
+            
+            {status === CallStatus.SEARCHING && (
+              <button
+                disabled
+                className="btn btn-primary btn-large desktop-start-btn"
+              >
+                <span className="material-icons">video_call</span>
+                Scanning...
+              </button>
+            )}
+            
+            <button 
+              onClick={toggleCamera} 
+              className={`control-btn ${!isCameraOn ? 'off' : ''}`}
+              title={isCameraOn ? "Turn off camera" : "Turn on camera"}
+            >
+              <span className="material-icons">
+                {isCameraOn ? 'videocam' : 'videocam_off'}
+              </span>
+            </button>
+            <button 
+              onClick={toggleMic} 
+              className={`control-btn ${!isMicOn ? 'off' : ''}`}
+              title={isMicOn ? "Mute" : "Unmute"}
+            >
+              <span className="material-icons">
+                {isMicOn ? 'mic' : 'mic_off'}
+              </span>
+            </button>
+          </div>
         </div>
 
-        {/* Remote Video */}
-        <div className="video-card remote">
-          <video
-            ref={remoteVideoRef}
-            autoPlay
-            playsInline
-          />
+        {status !== CallStatus.IDLE && (
+          <div className="video-card remote">
+            <video
+              ref={remoteVideoRef}
+              autoPlay
+              playsInline
+              className="full-video-element"
+            />
 
-          {/* Overlay: Searching / Idle */}
-          {(status === CallStatus.IDLE || status === CallStatus.SEARCHING) && (
-            <div className="overlay">
-              <div className="icon-tv">📺</div>
-              <p className="pulse-text">
-                {status === CallStatus.SEARCHING ? "SEARCHING FOR STRANGER..." : "WAITING TO START"}
-              </p>
-            </div>
-          )}
-
-          {/* Overlay: Call Ended */}
-          {status === CallStatus.CALL_ENDED && (
-            <div className="overlay ended">
-              <h2 className="overlay-title">Call Ended</h2>
-              <div className="controls" >
-                <button onClick={handleNextMatch} className="btn btn-warning">
-                  Next Match 🚀
-                </button>
-                <button onClick={() => setStatus(CallStatus.IDLE)} className="btn btn-outline">
-                  Stop
-                </button>
+            {status === CallStatus.SEARCHING && (
+              <div className="overlay">
+                <div className="spinner"></div>
+                <p className="pulse-text">SEARCHING FOR STRANGER...</p>
               </div>
-            </div>
-          )}
+            )}
 
-          <div className="video-label right">STRANGER</div>
-        </div>
+            {status === CallStatus.CALL_ENDED && (
+              <div className="overlay ended">
+                <h2 className="overlay-title">Call Ended</h2>
+                <div className="controls">
+                  <button onClick={handleNextMatch} className="btn btn-warning">
+                    <span className="material-icons">skip_next</span>
+                    Next Match
+                  </button>
+                  <button onClick={() => setStatus(CallStatus.IDLE)} className="btn btn-outline">
+                    <span className="material-icons">stop</span>
+                    Stop
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="video-label right">STRANGER</div>
+          </div>
+        )}
       </div>
 
-      {/* BUTTONS */}
-      <div className="controls">
+      <div className="bottom-controls mobile-only">
         {status !== CallStatus.CONNECTED ? (
           <button
             onClick={handleStart}
             disabled={status === CallStatus.SEARCHING || !isConnected}
-            className="btn btn-primary"
+            className="btn btn-primary btn-large"
           >
+            <span className="material-icons">video_call</span>
             {status === CallStatus.SEARCHING ? "Scanning..." : "Start Chat"}
           </button>
         ) : (
-          <>
+          <div className="connected-controls">
             <button onClick={handleNextMatch} className="btn btn-warning">
-              Next ⏭️
+              <span className="material-icons">skip_next</span>
+              Next
             </button>
-
             <button onClick={handleDisconnect} className="btn btn-danger">
-              Stop ⏹️
+              <span className="material-icons">call_end</span>
+              Stop
             </button>
-          </>
+          </div>
         )}
       </div>
 
+      {status === CallStatus.CONNECTED && (
+        <div className="bottom-controls desktop-connected">
+          <button onClick={handleNextMatch} className="btn btn-warning">
+            <span className="material-icons">skip_next</span>
+            Next
+          </button>
+          <button onClick={handleDisconnect} className="btn btn-danger">
+            <span className="material-icons">call_end</span>
+            Stop
+          </button>
+        </div>
+      )}
     </div>
   );
 }
